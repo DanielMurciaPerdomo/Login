@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs')
 
 const userSchema = new mongoose.Schema(
   {
-    nombre: {
+    name: {
       type: String,
       required: [true, 'El nombre es obligatorio'],
       trim: true, //Erased blanks 
@@ -32,9 +32,8 @@ const userSchema = new mongoose.Schema(
 //We used function to got the 'this' on the methods
 //Encriptar antes de guardar
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) return;
   this.password = await bcrypt.hash(this.password, 12); //salt rounds, or how difficult the password will be encrypt
-  next();
 });
 
 //Comparar contraseñas

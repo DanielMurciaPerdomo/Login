@@ -2,21 +2,23 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECERT, {expiresIn: '7d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET, {expiresIn: '7d' });
 };
 
 const register = async (req, res) => {
-  const { nombre, email, password } = req.body;
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    return res.status(400).json({ success: false, message: 'El usuario ya existe' });
-  }
   try {
-    const user = await User.create({ nombre, email, password });
+    const { name, email, password } = req.body;
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ success: false, message: 'El usuario ya existe' });
+    }
+  
+    const user = await User.create({ name, email, password });
     const token = generateToken(user._id);
     res.status(201).json({ success: true, data: { user, token } });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    console.error(error);
+    res.status(400).json({ success: false, message: "Error en el registro" });
   }
 }
 
@@ -45,7 +47,7 @@ const login = async (req, res) => {
 const getUsers = async (req, res) => {
   try {
     const users = await User.find();
-    res.json({ success: true, token,  data: users });
+    res.json({ success: true,  data: users });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

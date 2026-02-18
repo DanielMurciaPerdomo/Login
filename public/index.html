@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Autenticación</title>
+    <style>
+        /* Estilos básicos para que se vea moderno y limpio */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
+        .card { background: white; padding: 2.5rem; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 320px; text-align: center; }
+        h2 { margin-top: 0; color: #333; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        button { width: 100%; padding: 12px; background: #0056b3; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; transition: background 0.3s;}
+        button:hover { background: #004494; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .hidden { display: none; }
+        .toggle-link { color: #0056b3; cursor: pointer; text-decoration: underline; font-size: 0.9em; margin-top: 15px; display: inline-block; }
+        .message { margin-top: 10px; font-size: 0.9em; color: #d9534f; }
+    </style>
+</head>
+<body>
+
+<div class="card" id="auth-container">
+    
+    <div id="login-section">
+        <h2>Iniciar Sesión</h2>
+        <form id="login-form">
+            <input type="text" id="login-username" placeholder="Usuario o Correo" required>
+            <input type="password" id="login-password" placeholder="Contraseña" required>
+            <button type="submit">Entrar</button>
+        </form>
+        <p id="login-msg" class="message"></p>
+        <span class="toggle-link" onclick="toggleView('register-section')">¿No tienes cuenta? Regístrate aquí</span>
+    </div>
+
+    <div id="register-section" class="hidden">
+        <h2>Crear Cuenta</h2>
+        <form id="register-form">
+            <input type="text" id="reg-username" placeholder="Nombre de usuario" required>
+            <input type="email" id="reg-email" placeholder="Correo electrónico" required>
+            <input type="password" id="reg-password" placeholder="Contraseña" required>
+            <button type="submit">Registrarse</button>
+        </form>
+        <p id="reg-msg" class="message"></p>
+        <span class="toggle-link" onclick="toggleView('login-section')">¿Ya tienes cuenta? Inicia sesión</span>
+    </div>
+</div>
+
+<div class="card hidden" id="dashboard-container">
+    <h2>¡Acceso Concedido!</h2>
+    <p>Bienvenido al sistema.</p>
+    <p id="user-info" style="font-weight: bold; color: #0056b3;"></p>
+    <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
+</div>
+
+<script>
+    // =========================================================
+    // ⚠️ CONFIGURACIÓN IMPORTANTE: 
+    // Cambia esta URL por la dirección y puerto donde corre tu backend
+    // Ejemplo: http://localhost:8080 si usas Java Spring Boot, o http://localhost:3000 en Node
+    // =========================================================
+    const API_URL = 'http://localhost:3000'; 
+
+    // Función para cambiar entre Login y Registro
+    function toggleView(viewId) {
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('register-section').classList.add('hidden');
+        document.getElementById('login-msg').innerText = '';
+        document.getElementById('reg-msg').innerText = '';
+        document.getElementById(viewId).classList.remove('hidden');
+    }
+
+    // 1. Método para Iniciar Sesión
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault(); // Evita que la página se recargue
+
+        try {
+            // Para el Login (dentro de public/index.html)
+            // En el evento del formulario de LOGIN en index.html
+            const response = await fetch('/api/users/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    email: document.getElementById('login-username').value, // Aunque el ID sea 'username', envíalo como 'email'
+                    password: document.getElementById('login-password').value 
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                // Usamos el nombre que nos devuelve el servidor (data.data.user.name)
+                showDashboard(data.data.user.name); 
+            } else {
+                const errorData = await response.json();
+                document.getElementById('login-msg').innerText = errorData.message || 'Credenciales incorrectas.';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('login-msg').innerText = 'No se pudo conectar con el servidor.';
+        }
+    });
+
+    // 2. Método para Registrarse
+    // Localiza esta parte en tu index.html
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const response = await fetch('/api/users/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        name: document.getElementById('reg-username').value, // 👈 Debe decir 'name'
+                        email: document.getElementById('reg-email').value,
+                        password: document.getElementById('reg-password').value
+                    })
+                }); 
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('¡Usuario registrado con éxito en MongoDB!');
+                    toggleView('login-section');
+                } else {
+                    // Esto mostrará en el HTML el mensaje: "El nombre es obligatorio" o el error que sea
+                    document.getElementById('reg-msg').innerText = data.message || 'Error en validación';
+                }
+            } catch (error) {
+                document.getElementById('reg-msg').innerText = 'Error: El servidor no responde';
+            }
+        });
+
+    // Funciones de la interfaz
+    function showDashboard(username) {
+        document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('dashboard-container').classList.remove('hidden');
+        document.getElementById('user-info').innerText = username;
+    }
+
+    function logout() {
+        document.getElementById('auth-container').classList.remove('hidden');
+        document.getElementById('dashboard-container').classList.add('hidden');
+        document.getElementById('login-form').reset();
+    }
+</script>
+</body>
+</html>
