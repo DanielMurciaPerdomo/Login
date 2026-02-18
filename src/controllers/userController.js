@@ -1,4 +1,24 @@
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECERT, {expiresIn: '7d' });
+};
+
+const register = async (req, res) => {
+  const { nombre, email, password } = req.body;
+  const userExists = await User.findOne({ email });
+  if (userExists) {
+    return res.status(400).json({ success: false, message: 'El usuario ya existe' });
+  }
+  try {
+    const user = await User.create({ nombre, email, password });
+    const token = generateToken(user._id);
+    res.status(201).json({ success: true, data: { user, token } });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+}
 
 // Obtener todos los usuarios
 const getUsers = async (req, res) => {
