@@ -47,60 +47,133 @@
     </div>
 </div>
 
-<div class="card hidden" id="dashboard-container">
-    <h2>¡Acceso Concedido!</h2>
-    <p>Bienvenido al sistema.</p>
-    <p id="user-info" style="font-weight: bold; color: #0056b3;"></p>
+<div class="card hidden" id="dashboard-container" style="width: 500px;">
+    <h2>Panel de Usuarios</h2>
+    <p>Bienvenido, <span id="user-info" style="font-weight: bold; color: #0056b3;"></span></p>
+    
+    <div id="users-list-section" style="text-align: left; margin-top: 20px;">
+        <h3>Usuarios registrados:</h3>
+        <ul id="users-ul" style="list-style: none; padding: 0;"></ul>
+    </div>
+
     <button class="btn-danger" onclick="logout()">Cerrar Sesión</button>
 </div>
 
 <script>
-    // =========================================================
-    // ⚠️ CONFIGURACIÓN IMPORTANTE: 
-    // Cambia esta URL por la dirección y puerto donde corre tu backend
-    // Ejemplo: http://localhost:8080 si usas Java Spring Boot, o http://localhost:3000 en Node
-    // =========================================================
-    const API_URL = 'http://localhost:3000'; 
 
-    // Función para cambiar entre Login y Registro
+   const API_URL = 'http://localhost:3000'; 
+
     function toggleView(viewId) {
         document.getElementById('login-section').classList.add('hidden');
         document.getElementById('register-section').classList.add('hidden');
-        document.getElementById('login-msg').innerText = '';
-        document.getElementById('reg-msg').innerText = '';
         document.getElementById(viewId).classList.remove('hidden');
     }
 
-    // 1. Método para Iniciar Sesión
+    // 1. LOGIN
     document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault(); // Evita que la página se recargue
-
+        e.preventDefault();
         try {
-            // Para el Login (dentro de public/index.html)
-            // En el evento del formulario de LOGIN en index.html
-            const response = await fetch('/api/users/login', {
+            const response = await fetch(`${API_URL}/api/users/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    email: document.getElementById('login-username').value, // Aunque el ID sea 'username', envíalo como 'email'
+                    email: document.getElementById('login-username').value,
                     password: document.getElementById('login-password').value 
                 })
             });
 
+            const data = await response.json();
+
             if (response.ok) {
-                const data = await response.json();
-                // Usamos el nombre que nos devuelve el servidor (data.data.user.name)
-                showDashboard(data.data.user.name); 
+                // ✅ GUARDAR TOKEN
+                localStorage.setItem('token', data.data.token);
+                showDashboard(data.data.user.name);
+                loadUsers(); // Cargar la lista automáticamente
             } else {
-                const errorData = await response.json();
-                document.getElementById('login-msg').innerText = errorData.message || 'Credenciales incorrectas.';
+                document.getElementById('login-msg').innerText = data.message || 'Error';
             }
         } catch (error) {
-            console.error('Error:', error);
-            document.getElementById('login-msg').innerText = 'No se pudo conectar con el servidor.';
+            document.getElementById('login-msg').innerText = 'Error de conexión';
         }
     });
 
+    // 2. OBTENER USUARIOS (Ruta Protegida)
+    async function loadUsers() {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`${API_URL}/api/users`, {
+                method: 'GET',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` // ✅ ENVIAR TOKEN AL MIDDLEWARE
+                }
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                const ul = document.getElementById('users-ul');
+                    ul.innerHTML = ''; // Limpiar lista
+                    result.data.forEach(user => {
+                        const li = document.createElement('li');
+                    li.style.display = "flex";
+                    li.style.justifyContent = "space-between";
+                    li.style.alignItems = "center";
+                    li.style.padding = "10px";
+                    li.style.borderBottom = "1px solid #eee";
+                    
+                    // Creamos el contenido y el botón de eliminar
+                    li.innerHTML = `
+                        <span>👤 <strong>${user.name}</strong> - ${user.email}</span>
+                        <button class="btn-danger" 
+                                style="width: auto; padding: 5px 10px; font-size: 12px; margin: 0;" 
+                                onclick="deleteUser('${user._id}')">
+                            Eliminar
+                        </button>
+                    `;
+                    ul.appendChild(li);
+                });
+            }
+        } catch (error) {
+            console.error("Error cargando usuarios:", error);
+        }
+    }
+
+    async function deleteUser(id) {
+        if (!confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
+
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`${API_URL}/api/users/${id}`, {
+                method: 'DELETE',
+                headers: { 
+                    'Authorization': `Bearer ${token}` 
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert('Usuario eliminado correctamente');
+                loadUsers(); // Recargamos la lista para ver los cambios
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            console.error('Error al eliminar:', error);
+            alert('No se pudo eliminar al usuario');
+        }
+    }
+
+    function showDashboard(username) {
+        document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('dashboard-container').classList.remove('hidden');
+        document.getElementById('user-info').innerText = username;
+    }
+
+    function logout() {
+        localStorage.removeItem('token'); // Limpiar token
+        location.reload(); // Recargar para limpiar todo
+    }
     // 2. Método para Registrarse
     // Localiza esta parte en tu index.html
         document.getElementById('register-form').addEventListener('submit', async (e) => {
@@ -120,7 +193,9 @@
 
                 if (response.ok) {
                     alert('¡Usuario registrado con éxito en MongoDB!');
-                    toggleView('login-section');
+                    localStorage.setItem('token', data.data.token);
+                    showDashboard(data.data.user.name);
+                    loadUsers(); // Cargar la lista automáticamente
                 } else {
                     // Esto mostrará en el HTML el mensaje: "El nombre es obligatorio" o el error que sea
                     document.getElementById('reg-msg').innerText = data.message || 'Error en validación';
@@ -129,19 +204,6 @@
                 document.getElementById('reg-msg').innerText = 'Error: El servidor no responde';
             }
         });
-
-    // Funciones de la interfaz
-    function showDashboard(username) {
-        document.getElementById('auth-container').classList.add('hidden');
-        document.getElementById('dashboard-container').classList.remove('hidden');
-        document.getElementById('user-info').innerText = username;
-    }
-
-    function logout() {
-        document.getElementById('auth-container').classList.remove('hidden');
-        document.getElementById('dashboard-container').classList.add('hidden');
-        document.getElementById('login-form').reset();
-    }
 </script>
 </body>
 </html>
